@@ -1,7 +1,7 @@
-pandas==3.0.2
-numpy==2.4.4
-SQLAlchemy==2.0.51
-psycopg2-binary==2.9.12
-python-dotenv==1.2.2
-scikit-learn==1.9.0
-joblib==1.5.3
+pandas
+numpy
+SQLAlchemy
+psycopg2-binary
+python-dotenv
+scikit-learn
+joblib

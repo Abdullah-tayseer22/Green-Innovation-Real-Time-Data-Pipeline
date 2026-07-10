@@ -1,0 +1,22 @@
+{
+    "model_version": "1.0.0",
+    "algorithm": "Isolation Forest",
+    "trained_at": "2026-07-10T08:10:38.252585",
+    "training_records": 100,
+    "anomalies_detected": 0,
+    "features": [
+        "temp",
+        "humidity",
+        "pressure",
+        "sea_level",
+        "wind_speed",
+        "clouds",
+        "rain_1h",
+        "hour",
+        "day",
+        "month",
+        "season"
+    ],
+    "contamination": 0.05,
+    "random_state": 42
+}
