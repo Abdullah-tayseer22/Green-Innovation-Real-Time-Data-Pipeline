@@ -1,7 +1,6 @@
-# RealTime_Data_Pipeline
+# Green Innovation: Real-Time Agricultural Data Pipeline
 
-A real-time data pipeline framework for processing agriculture and weather data.  
-The structure is flexible to accommodate various data sources and processing workflows.
+A comprehensive real-time data pipeline and intelligence framework designed for monitoring, processing, and analyzing agricultural and weather data. The platform empowers farmers and decision-makers with actionable insights, anomaly detection, and automated farming recommendations.
 
 ## Table of Contents
 - [Project Overview](#project-overview)
@@ -12,76 +11,41 @@ The structure is flexible to accommodate various data sources and processing wor
 - [Project Structure](#project-structure)
 
 ## Project Overview
-This project demonstrates how to build a real-time data pipeline that ingests weather and agriculture data, processes it in streaming mode, and stores it for analytics and monitoring.  
-It is designed to be flexible so that new data sources and workflows can be added easily.
+This project demonstrates a complete, end-to-end real-time data pipeline. It ingests environmental data, processes it through machine learning models to detect anomalies, and serves the results via a fast API to an interactive frontend dashboard. The system is designed to be highly responsive, providing real-time agricultural intelligence to optimize resource usage and improve crop yield.
 
 ## Key Features
-- Real-time monitoring of agriculture and weather data  
-  Enables farmers and decision-makers to react immediately to changing conditions.
-
-- Efficient streaming using Kafka and PySpark  
-  Ensures continuous data processing without delays.
-
-- Flexible architecture to add new data sources  
-  Allows integration of additional sensors, APIs, or datasets in the future.
-
-- Analytics and decision-making for sustainable agriculture  
-  Helps optimize resource usage and improve crop yield.
-
-- Scalable, extensible, production-ready design  
-  Supports growing datasets and multiple farms or regions.
-
-- Learning and skill development for Data Engineering  
-  Ideal for academic and professional growth.
-
-- Monitoring key environmental factors:
-  - Weather changes – Detect sudden variations to prevent crop damage.
-  - Soil moisture / humidity – Ensure optimal irrigation and avoid water wastage.
-  - Temperature fluctuations – Adjust planting schedules and protect crops from extreme heat or frost.
-  - Irrigation levels – Monitor and manage water distribution effectively.
-  - Early warning alerts – Provide proactive alerts to prevent losses.
-
-- Smart crop management system:
-  - Optimal crops to plant – Select crops best suited to soil, climate, and seasonal trends.
-  - Best planting times and locations – Maximize growth and minimize resource waste.
-  - Recommended cultivation methods – Provide scientific guidance for irrigation, fertilization, and harvesting.
-  - Scientific recommendations for maximum yield and sustainability – Ensure long-term productivity while preserving the environment.
+- **Executive Overview Dashboard:** Real-time monitoring of current risks, total loaded recommendations, and anomaly summaries across represented cities. Includes visual risk distribution and high-priority alerts.
+- **Farm Location Intelligence:** Interactive map allowing users to use device GPS or input specific latitude/longitude coordinates. Generates immediate irrigation, spraying, and risk guidance based on live weather data.
+- **Smart Recommendation Engine:** Provides detailed risk assessments (Anomaly Scores and Status) and explicit recommended actions for irrigation and agricultural spraying.
+- **Live Agricultural Recommendation Feed:** A comprehensive, searchable read-only feed of all historical and current weather-based guidance records.
+- **Efficient Streaming:** Utilizes Apache Kafka for seamless, delay-free data streaming.
 
 ## Architecture
-1. Data ingestion from external APIs (weather, agriculture, soil sensors, etc.)  
-2. Real-time streaming using Kafka  
-3. Data processing with PySpark  
-4. Data storage in Redshift / PostgreSQL  
-5. Orchestration using Airflow  
-6. Monitoring and logging of pipeline jobs and data freshness  
-7. Smart crop recommendation system based on environmental and historical data
+1. **Data Ingestion:** Fetching external environmental and weather data (`ingestion` module).
+2. **Message Brokering:** Real-time streaming and event management using Apache Kafka & Zookeeper.
+3. **Data Processing & ML:** Processing incoming streams and applying machine learning models (Scikit-learn) for anomaly detection and scoring.
+4. **Data Storage:** Relational storage of processed data and recommendations in PostgreSQL.
+5. **Backend API:** A high-performance FastAPI server serving processed insights to the client.
+6. **Frontend UI:** A responsive React-based interface for data visualization and user interaction.
 
 ## Tech Stack
-- Python  
-- Apache Kafka  
-- PySpark  
-- Apache Airflow  
-- Redshift / PostgreSQL  
-- Docker (optional)  
-- SQL for analytics and reporting  
-- Data science libraries (Pandas, NumPy, SciPy) for crop recommendation logic
+### Frontend
+- **React.js** (Vite)
+- Interactive mapping libraries
+
+### Backend & Data Processing
+- **Python**
+- **FastAPI** (with Uvicorn)
+- **Scikit-learn / Pandas / NumPy** (Machine Learning & Data Processing)
+
+### Infrastructure & Streaming
+- **Apache Kafka** & **Zookeeper**
+- **Docker** & **Docker Compose** (Containerization)
+- **PostgreSQL** (Database)
+- **pgAdmin** (Database Management)
 
 ## Usage
-- Define data sources and processing steps according to team needs.  
-- Flexible pipeline structure supports future extensions.  
-- Supports both real-time and near real-time data processing.  
-- Can be used as a foundation for green innovation projects in agriculture and environment.  
-- Generates actionable insights for crop planning, irrigation management, and risk mitigation.
-
-## Project Structure
-```text
-RealTime_Data_Pipeline/
-├── ingestion/       # APIs and sensor data ingestion
-├── streaming/       # Kafka streaming jobs
-├── processing/      # PySpark transformations
-├── storage/         # Redshift/PostgreSQL storage scripts
-├── airflow/         # Airflow DAGs and pipelines
-├── monitoring/      # Logs and monitoring scripts
-├── recommendations/ # Crop recommendation system
-├── requirements.txt
-└── README.md
+1. Ensure **Docker Desktop** is running.
+2. Spin up the infrastructure (Kafka, Zookeeper, PostgreSQL, pgAdmin) using Docker Compose:
+   ```bash
+   docker-compose up -d --build
