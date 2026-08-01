@@ -3,3 +3,12 @@ venv/
 stream_checkpoints/
 .ipynb_checkpoints/
 __pycache__/
+# Local dependencies and secrets
+node_modules/
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+freelance/*.zip
+freelance/*.mp4

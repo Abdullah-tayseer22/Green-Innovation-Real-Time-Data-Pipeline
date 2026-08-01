@@ -16,20 +16,26 @@ Provides:
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
 import os
+import secrets
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+import jwt
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Path as FastAPIPath, Query
+from fastapi import Depends, FastAPI, HTTPException, Path as FastAPIPath, Query, status
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -90,6 +96,10 @@ OPENWEATHER_CURRENT_URL = (
 )
 
 MODEL_VERSION = "1.0.0"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-development-secret")
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "120"))
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 # ==========================================================
@@ -144,9 +154,122 @@ class LocationAnalysisRequest(BaseModel):
     )
 
 
+class RegisterRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=120)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class UserResponse(BaseModel):
+    id: int
+    full_name: str
+    email: EmailStr
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
 # ==========================================================
 # Utility Functions
 # ==========================================================
+
+
+def create_users_table() -> None:
+    engine = get_database_engine()
+    query = text(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            full_name VARCHAR(120) NOT NULL,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_idx
+            ON users (LOWER(email));
+        """
+    )
+    try:
+        with engine.begin() as connection:
+            connection.execute(query)
+    finally:
+        engine.dispose()
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    iterations = 310_000
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return f"pbkdf2_sha256${iterations}${base64.b64encode(salt).decode()}${base64.b64encode(digest).decode()}"
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        algorithm, iterations_text, salt_text, digest_text = stored_hash.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        salt = base64.b64decode(salt_text)
+        expected = base64.b64decode(digest_text)
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(iterations_text))
+        return hmac.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
+
+
+def create_access_token(user_id: int, email: str) -> str:
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": str(user_id), "email": email, "exp": expires_at, "iat": datetime.now(timezone.utc)}
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
+def get_user_by_email(email: str) -> dict[str, Any] | None:
+    engine = get_database_engine()
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT id, full_name, email, password_hash, is_active FROM users WHERE LOWER(email)=LOWER(:email) LIMIT 1"),
+                {"email": email.strip()},
+            ).mappings().first()
+        return dict(row) if row else None
+    finally:
+        engine.dispose()
+
+
+def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
+    credentials_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="You must log in before analyzing a location.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        user_id = int(payload.get("sub"))
+    except (jwt.PyJWTError, TypeError, ValueError):
+        raise credentials_error
+
+    engine = get_database_engine()
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT id, full_name, email, is_active FROM users WHERE id=:user_id LIMIT 1"),
+                {"user_id": user_id},
+            ).mappings().first()
+    finally:
+        engine.dispose()
+
+    if not row or not row["is_active"]:
+        raise credentials_error
+    return dict(row)
+
 
 def make_json_safe(value: Any) -> Any:
     """
@@ -590,6 +713,54 @@ def analyze_weather_record(
 # API Endpoints
 # ==========================================================
 
+@app.on_event("startup")
+def initialize_auth_storage() -> None:
+    create_users_table()
+
+
+@app.post("/api/v1/auth/register", response_model=AuthResponse, status_code=201, tags=["Authentication"])
+def register_user(payload: RegisterRequest) -> dict[str, Any]:
+    email = payload.email.lower().strip()
+    full_name = " ".join(payload.full_name.split())
+    if get_user_by_email(email):
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+
+    engine = get_database_engine()
+    try:
+        with engine.begin() as connection:
+            row = connection.execute(
+                text("""
+                    INSERT INTO users (full_name, email, password_hash)
+                    VALUES (:full_name, :email, :password_hash)
+                    RETURNING id, full_name, email
+                """),
+                {"full_name": full_name, "email": email, "password_hash": hash_password(payload.password)},
+            ).mappings().one()
+    except SQLAlchemyError as error:
+        logger.exception("Could not register user.")
+        raise HTTPException(status_code=500, detail="The account could not be created.") from error
+    finally:
+        engine.dispose()
+
+    user = dict(row)
+    return {"access_token": create_access_token(user["id"], user["email"]), "token_type": "bearer", "user": user}
+
+
+@app.post("/api/v1/auth/login", response_model=AuthResponse, tags=["Authentication"])
+def login_user(payload: LoginRequest) -> dict[str, Any]:
+    user = get_user_by_email(payload.email)
+    if not user or not user["is_active"] or not verify_password(payload.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password.", headers={"WWW-Authenticate": "Bearer"})
+
+    safe_user = {"id": user["id"], "full_name": user["full_name"], "email": user["email"]}
+    return {"access_token": create_access_token(user["id"], user["email"]), "token_type": "bearer", "user": safe_user}
+
+
+@app.get("/api/v1/auth/me", response_model=UserResponse, tags=["Authentication"])
+def read_current_user(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    return current_user
+
+
 @app.get(
     "/api/v1/health",
     tags=["System"],
@@ -762,6 +933,7 @@ def get_recommendations_by_city(
 )
 def analyze_location(
     coordinates: LocationAnalysisRequest,
+    current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     """
     Analyze any valid latitude and longitude.

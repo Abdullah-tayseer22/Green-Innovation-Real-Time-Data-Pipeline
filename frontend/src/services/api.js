@@ -1,5 +1,9 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
 
+export function getStoredToken() { return localStorage.getItem('greenInnovationToken') || ''; }
+
+export function clearStoredAuth() { localStorage.removeItem('greenInnovationToken'); localStorage.removeItem('greenInnovationUser'); }
+
 async function request(path, options = {}) {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 10000);
@@ -7,9 +11,11 @@ async function request(path, options = {}) {
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
+      auth: undefined,
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
+        ...(options.auth !== false && getStoredToken() ? { Authorization: `Bearer ${getStoredToken()}` } : {}),
         ...options.headers,
       },
     });
@@ -59,3 +65,20 @@ export function analyzeLocation({ latitude, longitude }) {
     body: JSON.stringify({ latitude, longitude }),
   });
 }
+
+
+export function registerAccount({ fullName, email, password }) {
+  return request('/api/v1/auth/register', {
+    method: 'POST', auth: false, headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ full_name: fullName, email, password }),
+  });
+}
+
+export function loginAccount({ email, password }) {
+  return request('/api/v1/auth/login', {
+    method: 'POST', auth: false, headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function getCurrentUser() { return request('/api/v1/auth/me'); }

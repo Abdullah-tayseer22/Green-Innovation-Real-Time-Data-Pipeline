@@ -8,6 +8,7 @@ export function Icon({ name, size = 24, className = '', title }) {
     anomaly: <><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v4M12 17h.01"/></>,
     risk: <><path d="M4 17 10 11l4 4 6-8"/><path d="M15 7h5v5"/></>,
     city: <><path d="M4 20V8h6v12M10 20V4h7v16M17 20v-9h3v9"/><path d="M7 11h.01M7 15h.01M13 8h.01M13 12h.01M13 16h.01"/></>,
+    home: <><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M9.5 20v-6h5v6"/></>,
     overview: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></>,
     recommendations: <><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></>,
     chevron: <path d="m9 18 6-6-6-6"/>,
